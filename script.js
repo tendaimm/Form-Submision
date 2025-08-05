@@ -242,16 +242,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     console.log('Search results:', searchResults);
                     
-                    // Combine submission result with search results
-                    const combinedResult = {
-                        ...submissionResult,
-                        searchResults: searchResults,
-                        hasSearchResults: true
-                    };
-                    
-                    // Hide loading and show results
-                    loadingDiv.classList.add('hidden');
-                    displayResults(combinedResult, formData);
+                    // Check if this is just a workflow start confirmation
+                    if (searchResults.message === "Workflow was started") {
+                        // Show that the workflow is processing
+                        loadingDiv.classList.add('hidden');
+                        displayResults({
+                            ...submissionResult,
+                            workflowStarted: true,
+                            searchStatus: 'processing'
+                        }, formData);
+                    } else {
+                        // Combine submission result with actual search results
+                        const combinedResult = {
+                            ...submissionResult,
+                            searchResults: searchResults,
+                            hasSearchResults: true
+                        };
+                        
+                        // Hide loading and show results
+                        loadingDiv.classList.add('hidden');
+                        displayResults(combinedResult, formData);
+                    }
                 } else {
                     console.warn('Webhook request failed with status:', webhookResponse.status);
                     const errorText = await webhookResponse.text();
@@ -379,6 +390,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     `;
                 }
+            } else if (data.workflowStarted && data.searchStatus === 'processing') {
+                resultsHtml += `
+                    <div class="results-card" style="border-color: #17a2b8; background-color: #f0f9ff;">
+                        <h4 style="color: #0c5460;">🔄 Search In Progress</h4>
+                        <p>Your adverse media search workflow has been successfully initiated.</p>
+                        <p>The n8n workflow is now processing your request and searching through various data sources.</p>
+                        <div style="margin: 15px 0; padding: 10px; background-color: #e7f3ff; border-radius: 5px;">
+                            <p><strong>Next Steps:</strong></p>
+                            <ul style="margin: 5px 0; padding-left: 20px;">
+                                <li>The workflow will search multiple adverse media databases</li>
+                                <li>Results will be compiled and analyzed automatically</li>
+                                <li>You may need to check your n8n workflow output for final results</li>
+                            </ul>
+                        </div>
+                        <p><em>Note: The n8n workflow is running in the background. Check your n8n dashboard for completion status and detailed results.</em></p>
+                    </div>
+                `;
             } else if (data.searchError) {
                 resultsHtml += `
                     <div class="results-card" style="border-color: #ffc107; background-color: #fffbf0;">
