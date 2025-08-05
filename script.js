@@ -186,23 +186,67 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Handle different response types
-            let result;
+            let submissionResult;
             const contentType = response.headers.get('content-type');
             
             if (contentType && contentType.includes('application/json')) {
-                result = await response.json();
+                submissionResult = await response.json();
             } else {
                 const textResponse = await response.text();
                 try {
-                    result = JSON.parse(textResponse);
+                    submissionResult = JSON.parse(textResponse);
                 } catch (e) {
-                    result = { message: textResponse };
+                    submissionResult = { message: textResponse };
                 }
             }
             
-            // Hide loading and show results
-            loadingDiv.classList.add('hidden');
-            displayResults(result, formData);
+            console.log('Form submission result:', submissionResult);
+            
+            // Now fetch the search results from the webhook endpoint
+            console.log('Fetching search results from webhook...');
+            
+            // Wait a moment for n8n to process
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            try {
+                const webhookResponse = await fetch('https://tmm98.app.n8n.cloud/webhook/fe70b591-ea9d-4007-98bb-7c2a5e8c789f', {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                console.log('Webhook response status:', webhookResponse.status);
+                
+                if (webhookResponse.ok) {
+                    const searchResults = await webhookResponse.json();
+                    console.log('Search results:', searchResults);
+                    
+                    // Combine submission result with search results
+                    const combinedResult = {
+                        ...submissionResult,
+                        searchResults: searchResults,
+                        hasSearchResults: true
+                    };
+                    
+                    // Hide loading and show results
+                    loadingDiv.classList.add('hidden');
+                    displayResults(combinedResult, formData);
+                } else {
+                    console.warn('Webhook request failed:', webhookResponse.status);
+                    // Show submission result without search results
+                    loadingDiv.classList.add('hidden');
+                    displayResults({...submissionResult, searchError: 'Search results temporarily unavailable'}, formData);
+                }
+            } catch (webhookError) {
+                console.error('Error fetching search results:', webhookError);
+                // Show submission result without search results
+                loadingDiv.classList.add('hidden');
+                displayResults({...submissionResult, searchError: 'Search results temporarily unavailable'}, formData);
+            }
             
         } catch (error) {
             console.error('Error submitting form:', error);
@@ -261,29 +305,63 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Display search results if available
         if (data && typeof data === 'object') {
-            if (data.results && Array.isArray(data.results) && data.results.length > 0) {
-                resultsHtml += `
-                    <div class="results-card">
-                        <h4>Adverse Media Search Results</h4>
-                `;
+            if (data.hasSearchResults && data.searchResults) {
+                const searchData = data.searchResults;
                 
-                data.results.forEach((result, index) => {
+                if (searchData.results && Array.isArray(searchData.results) && searchData.results.length > 0) {
                     resultsHtml += `
-                        <div style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #2c5f2d;">
-                            <p><strong>Result ${index + 1}:</strong></p>
-                            <p>${typeof result === 'object' ? JSON.stringify(result, null, 2) : result}</p>
+                        <div class="results-card" style="border-color: #e74c3c; background-color: #fff5f5;">
+                            <h4 style="color: #e74c3c;">⚠️ Adverse Media Found</h4>
+                    `;
+                    
+                    searchData.results.forEach((result, index) => {
+                        resultsHtml += `
+                            <div style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #e74c3c; background-color: white; border-radius: 5px;">
+                                <p><strong>Finding ${index + 1}:</strong></p>
+                                <p>${typeof result === 'object' ? JSON.stringify(result, null, 2) : result}</p>
+                            </div>
+                        `;
+                    });
+                    
+                    resultsHtml += `</div>`;
+                } else {
+                    resultsHtml += `
+                        <div class="results-card" style="border-color: #27ae60; background-color: #f8fff9;">
+                            <h4 style="color: #27ae60;">✅ Clean Search Result</h4>
+                            <div class="no-results">
+                                <p>No adverse media findings for the submitted information.</p>
+                                <p>This individual has a clean media profile.</p>
+                            </div>
                         </div>
                     `;
-                });
+                }
                 
-                resultsHtml += `</div>`;
+                // Display search metadata
+                if (searchData.searchDate || searchData.sources || searchData.totalChecked) {
+                    resultsHtml += `
+                        <div class="results-card">
+                            <h4>Search Details</h4>
+                            ${searchData.searchDate ? `<p><strong>Search Date:</strong> ${searchData.searchDate}</p>` : ''}
+                            ${searchData.sources ? `<p><strong>Sources Checked:</strong> ${Array.isArray(searchData.sources) ? searchData.sources.join(', ') : searchData.sources}</p>` : ''}
+                            ${searchData.totalChecked ? `<p><strong>Records Checked:</strong> ${searchData.totalChecked}</p>` : ''}
+                        </div>
+                    `;
+                }
+            } else if (data.searchError) {
+                resultsHtml += `
+                    <div class="results-card" style="border-color: #ffc107; background-color: #fffbf0;">
+                        <h4 style="color: #856404;">⚠️ Search Status</h4>
+                        <p>Form submitted successfully, but search results are temporarily unavailable.</p>
+                        <p><small>${data.searchError}</small></p>
+                        <p><em>Please contact support if this issue persists.</em></p>
+                    </div>
+                `;
             } else {
                 resultsHtml += `
                     <div class="results-card">
                         <h4>Search Results</h4>
                         <div class="no-results">
-                            <p>No adverse media findings for the submitted information.</p>
-                            <p>This is a clean result.</p>
+                            <p>Search completed. Processing results...</p>
                         </div>
                     </div>
                 `;
