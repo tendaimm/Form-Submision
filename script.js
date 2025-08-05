@@ -153,15 +153,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Prepare form data
         const formData = {
-            name: document.getElementById('name').value.trim(),
-            location: document.getElementById('location').value.trim(),
-            address: document.getElementById('address').value.trim(),
-            nationality: document.getElementById('nationality').value,
-            gender: document.getElementById('gender').value,
-            age: parseInt(document.getElementById('age').value),
-            idPassport: document.getElementById('idPassport').value.trim(),
-            timestamp: new Date().toISOString(),
-            source: 'Green4Digital Adverse Media Search Form'
+            "Name": document.getElementById('name').value.trim(),
+            "Location": document.getElementById('location').value.trim(),
+            "Address": document.getElementById('address').value.trim(),
+            "Nationality": document.getElementById('nationality').value,
+            "Gender": document.getElementById('gender').value,
+            "Age": parseInt(document.getElementById('age').value),
+            "ID/Passport number": document.getElementById('idPassport').value.trim(),
+            "submittedAt": new Date().toISOString(),
+            "formMode": "production"
         };
 
         try {
@@ -335,14 +335,14 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsHtml += `
             <div class="results-card">
                 <h4>Submitted Information</h4>
-                <p><strong>Name:</strong> ${originalFormData.name}</p>
-                <p><strong>Location:</strong> ${originalFormData.location}</p>
-                <p><strong>Address:</strong> ${originalFormData.address}</p>
-                <p><strong>Nationality:</strong> ${originalFormData.nationality}</p>
-                <p><strong>Gender:</strong> ${originalFormData.gender}</p>
-                <p><strong>Age:</strong> ${originalFormData.age}</p>
-                <p><strong>ID/Passport:</strong> ${originalFormData.idPassport}</p>
-                <p><strong>Submitted:</strong> ${new Date(originalFormData.timestamp).toLocaleString()}</p>
+                <p><strong>Name:</strong> ${originalFormData.Name}</p>
+                <p><strong>Location:</strong> ${originalFormData.Location}</p>
+                <p><strong>Address:</strong> ${originalFormData.Address}</p>
+                <p><strong>Nationality:</strong> ${originalFormData.Nationality}</p>
+                <p><strong>Gender:</strong> ${originalFormData.Gender}</p>
+                <p><strong>Age:</strong> ${originalFormData.Age}</p>
+                <p><strong>ID/Passport:</strong> ${originalFormData["ID/Passport number"]}</p>
+                <p><strong>Submitted:</strong> ${new Date(originalFormData.submittedAt).toLocaleString()}</p>
             </div>
         `;
 
