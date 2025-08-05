@@ -209,6 +209,8 @@ document.addEventListener('DOMContentLoaded', function() {
             await new Promise(resolve => setTimeout(resolve, 2000));
             
             try {
+                console.log('Making webhook request with data:', formData);
+                
                 const webhookResponse = await fetch('https://tmm98.app.n8n.cloud/webhook/fe70b591-ea9d-4007-98bb-7c2a5e8c789f', {
                     method: 'POST',
                     mode: 'cors',
@@ -220,9 +222,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 console.log('Webhook response status:', webhookResponse.status);
+                console.log('Webhook response ok:', webhookResponse.ok);
                 
                 if (webhookResponse.ok) {
-                    const searchResults = await webhookResponse.json();
+                    let searchResults;
+                    const contentType = webhookResponse.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        searchResults = await webhookResponse.json();
+                    } else {
+                        const textResponse = await webhookResponse.text();
+                        console.log('Webhook text response:', textResponse);
+                        try {
+                            searchResults = JSON.parse(textResponse);
+                        } catch (e) {
+                            searchResults = { message: textResponse, rawResponse: textResponse };
+                        }
+                    }
+                    
                     console.log('Search results:', searchResults);
                     
                     // Combine submission result with search results
@@ -236,16 +253,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadingDiv.classList.add('hidden');
                     displayResults(combinedResult, formData);
                 } else {
-                    console.warn('Webhook request failed:', webhookResponse.status);
+                    console.warn('Webhook request failed with status:', webhookResponse.status);
+                    const errorText = await webhookResponse.text();
+                    console.warn('Webhook error response:', errorText);
+                    
                     // Show submission result without search results
                     loadingDiv.classList.add('hidden');
-                    displayResults({...submissionResult, searchError: 'Search results temporarily unavailable'}, formData);
+                    displayResults({
+                        ...submissionResult, 
+                        searchError: `Search service returned error ${webhookResponse.status}: ${errorText || 'Unknown error'}`
+                    }, formData);
                 }
             } catch (webhookError) {
                 console.error('Error fetching search results:', webhookError);
+                console.error('Webhook error details:', {
+                    message: webhookError.message,
+                    stack: webhookError.stack,
+                    name: webhookError.name
+                });
+                
                 // Show submission result without search results
                 loadingDiv.classList.add('hidden');
-                displayResults({...submissionResult, searchError: 'Search results temporarily unavailable'}, formData);
+                displayResults({
+                    ...submissionResult, 
+                    searchError: `Search service connection failed: ${webhookError.message}`
+                }, formData);
             }
             
         } catch (error) {
