@@ -165,14 +165,21 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         try {
-            // Submit to n8n webhook
+            console.log('Submitting form data:', formData);
+            
+            // Submit to n8n webhook with CORS handling
             const response = await fetch('https://tmm98.app.n8n.cloud/webhook/fe70b591-ea9d-4007-98bb-7c2a5e8c789f', {
                 method: 'POST',
+                mode: 'cors',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                 },
                 body: JSON.stringify(formData)
             });
+            
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -203,12 +210,28 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide loading
             loadingDiv.classList.add('hidden');
             
+            let errorMessage = 'There was an error processing your request.';
+            let technicalDetails = error.message;
+            
+            if (error.message === 'Failed to fetch') {
+                errorMessage = 'Unable to connect to the processing server. This might be due to network restrictions or CORS policy.';
+                technicalDetails = 'The browser blocked the request due to CORS policy or network connectivity issues.';
+            }
+            
             // Show error message
             resultsContent.innerHTML = `
                 <div class="results-card" style="border-color: #e74c3c; background-color: #fff5f5;">
                     <h4 style="color: #e74c3c;">Submission Error</h4>
-                    <p>There was an error processing your request. Please try again later.</p>
-                    <p><small>Error: ${error.message}</small></p>
+                    <p>${errorMessage}</p>
+                    <p><small>Technical details: ${technicalDetails}</small></p>
+                    <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 12px;">
+                        <strong>Troubleshooting:</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            <li>Check your internet connection</li>
+                            <li>Try refreshing the page and submitting again</li>
+                            <li>The n8n webhook server might be temporarily unavailable</li>
+                        </ul>
+                    </div>
                     <button onclick="resetForm()" class="submit-btn" style="margin-top: 15px; width: auto; padding: 10px 20px;">
                         Try Again
                     </button>
