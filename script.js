@@ -167,8 +167,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             console.log('Submitting form data:', formData);
             
-            // Submit to n8n webhook with CORS handling
-            const response = await fetch('https://tmm98.app.n8n.cloud/webhook/fe70b591-ea9d-4007-98bb-7c2a5e8c789f', {
+            // Submit to n8n form endpoint
+            const response = await fetch('https://tmm98.app.n8n.cloud/form/3b1449a0-4085-480b-885f-c5b4b48a193c', {
                 method: 'POST',
                 mode: 'cors',
                 headers: {
