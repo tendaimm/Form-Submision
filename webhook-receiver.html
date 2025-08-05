@@ -1,0 +1,260 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Receiver - Green4Digital</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #2c5f2d;
+        }
+        .header h1 {
+            color: #2c5f2d;
+            margin: 0;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .waiting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .received {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .data-container {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .data-container h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        pre {
+            background-color: #f1f3f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .clear-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .clear-btn:hover {
+            background-color: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Webhook Receiver</h1>
+            <p>Endpoint for receiving n8n workflow responses</p>
+        </div>
+
+        <div id="status" class="status waiting">
+            Waiting for webhook data...
+        </div>
+
+        <div id="dataContainer" class="data-container" style="display: none;">
+            <h3>Received Data</h3>
+            <div id="timestamp" class="timestamp"></div>
+            <pre id="dataContent"></pre>
+            <button onclick="clearData()" class="clear-btn">Clear Data</button>
+        </div>
+
+        <div class="data-container">
+            <h3>Webhook URL</h3>
+            <p>Send your n8n workflow results to this page by posting to:</p>
+            <pre id="webhookUrl"></pre>
+            <p><strong>HTTP Method:</strong> POST</p>
+            <p><strong>Content-Type:</strong> application/json or text/plain</p>
+        </div>
+
+        <div class="data-container">
+            <h3>Example n8n HTTP Request Node Configuration</h3>
+            <pre>
+URL: [Your webhook URL above]
+Method: POST
+Headers:
+  Content-Type: application/json
+Body:
+  {
+    "searchResults": "{{ $json }}",
+    "status": "completed",
+    "timestamp": "{{ new Date().toISOString() }}"
+  }
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        // Set the webhook URL based on current location
+        document.getElementById('webhookUrl').textContent = window.location.origin + window.location.pathname;
+
+        // Function to handle incoming webhook data
+        function receiveWebhookData(data) {
+            const statusEl = document.getElementById('status');
+            const containerEl = document.getElementById('dataContainer');
+            const timestampEl = document.getElementById('timestamp');
+            const contentEl = document.getElementById('dataContent');
+
+            // Update status
+            statusEl.className = 'status received';
+            statusEl.textContent = 'Webhook data received successfully!';
+
+            // Show data container
+            containerEl.style.display = 'block';
+
+            // Set timestamp
+            timestampEl.textContent = 'Received at: ' + new Date().toLocaleString();
+
+            // Display data
+            if (typeof data === 'object') {
+                contentEl.textContent = JSON.stringify(data, null, 2);
+            } else {
+                contentEl.textContent = data;
+            }
+
+            // Store in localStorage for persistence
+            localStorage.setItem('lastWebhookData', JSON.stringify({
+                data: data,
+                timestamp: new Date().toISOString()
+            }));
+        }
+
+        // Function to clear displayed data
+        function clearData() {
+            const statusEl = document.getElementById('status');
+            const containerEl = document.getElementById('dataContainer');
+
+            statusEl.className = 'status waiting';
+            statusEl.textContent = 'Waiting for webhook data...';
+            containerEl.style.display = 'none';
+
+            localStorage.removeItem('lastWebhookData');
+        }
+
+        // Check for existing data on page load
+        function loadExistingData() {
+            const stored = localStorage.getItem('lastWebhookData');
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    receiveWebhookData(parsed.data);
+                } catch (e) {
+                    console.error('Error loading stored data:', e);
+                }
+            }
+        }
+
+        // Handle URL parameters (for GET requests with data)
+        function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const data = urlParams.get('data');
+            if (data) {
+                try {
+                    const parsed = JSON.parse(decodeURIComponent(data));
+                    receiveWebhookData(parsed);
+                } catch (e) {
+                    receiveWebhookData(data);
+                }
+            }
+        }
+
+        // Handle POST data (this would normally be handled by a server)
+        // For client-side handling, we'll use postMessage or other methods
+        function setupMessageListener() {
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'webhook') {
+                    receiveWebhookData(event.data.payload);
+                }
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadExistingData();
+            checkUrlParams();
+            setupMessageListener();
+        });
+
+        // Expose function globally for external use
+        window.receiveWebhookData = receiveWebhookData;
+
+        // Example: Simulate receiving data (for testing)
+        function simulateWebhook() {
+            const sampleData = {
+                name: "John Doe",
+                searchResults: [
+                    {
+                        source: "News Database",
+                        findings: "No adverse media found"
+                    },
+                    {
+                        source: "Sanctions List",
+                        findings: "No matches found"
+                    }
+                ],
+                status: "completed",
+                timestamp: new Date().toISOString()
+            };
+            receiveWebhookData(sampleData);
+        }
+
+        // Add test button (uncomment for testing)
+        // setTimeout(() => {
+        //     const testBtn = document.createElement('button');
+        //     testBtn.textContent = 'Test with Sample Data';
+        //     testBtn.onclick = simulateWebhook;
+        //     testBtn.style.cssText = 'margin: 10px; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;';
+        //     document.querySelector('.container').appendChild(testBtn);
+        // }, 1000);
+    </script>
+</body>
+</html>
