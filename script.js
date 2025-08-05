@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Submit to n8n webhook
-            const response = await fetch('https://tmm98.app.n8n.cloud/form-test/3b1449a0-4085-480b-885f-c5b4b48a193c', {
+            const response = await fetch('https://tmm98.app.n8n.cloud/webhook/fe70b591-ea9d-4007-98bb-7c2a5e8c789f', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -178,7 +178,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const result = await response.json();
+            // Handle different response types
+            let result;
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                const textResponse = await response.text();
+                try {
+                    result = JSON.parse(textResponse);
+                } catch (e) {
+                    result = { message: textResponse };
+                }
+            }
             
             // Hide loading and show results
             loadingDiv.classList.add('hidden');
