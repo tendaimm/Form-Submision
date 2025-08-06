@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('adverseMediaForm');
     const loadingDiv = document.getElementById('loading');
@@ -146,11 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Show loading state
-        form.style.display = 'none';
-        loadingDiv.classList.remove('hidden');
-        resultsDiv.classList.add('hidden');
-
         // Prepare form data
         const formData = {
             "Name": document.getElementById('name').value.trim(),
@@ -159,309 +153,204 @@ document.addEventListener('DOMContentLoaded', function() {
             "Nationality": document.getElementById('nationality').value,
             "Gender": document.getElementById('gender').value,
             "Age": parseInt(document.getElementById('age').value),
-            "ID/Passport number": document.getElementById('idPassport').value.trim(),
-            "submittedAt": new Date().toISOString(),
-            "formMode": "production"
+            "ID/Passport number": document.getElementById('idPassport').value.trim() || 'unknown',
+            "submittedAt": new Date().toISOString()
         };
 
-        try {
-            console.log('Submitting form data:', formData);
-            
-            // Submit to n8n form endpoint
-            const response = await fetch('https://tmm98.app.n8n.cloud/form/3b1449a0-4085-480b-885f-c5b4b48a193c', {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
-            
-            console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
+        // Show loading indicator
+        const loadingDiv = document.getElementById('loading');
+        loadingDiv.classList.remove('hidden');
+        
+        // Hide any previous results
+        document.getElementById('results').classList.add('hidden');
 
+        try {
+            console.log('Preparing search with data:', formData);
+            
+            // Construct query parameters from form data
+            const params = new URLSearchParams();
+            params.append('Name', formData.Name.replace(/\s+/g, ''));
+            params.append('Location', formData.Location);
+            params.append('Address', formData.Address);
+            params.append('Nationality', formData.Nationality);
+            params.append('Gender', formData.Gender);
+            params.append('Age', formData.Age);
+            params.append('ID/Passport number', formData["ID/Passport number"]);
+            
+            const searchUrl = `https://tmm98.app.n8n.cloud/webhook/search?${params.toString()}`;
+            console.log('Making request to:', searchUrl);
+            
+            // Make the request
+            const response = await fetch(searchUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                }
+            });
+
+            console.log('Response status:', response.status);
+            
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            // Handle different response types
-            let submissionResult;
-            const contentType = response.headers.get('content-type');
+            // Get the response as text
+            const responseText = await response.text();
+            console.log('Raw response:', responseText);
             
-            if (contentType && contentType.includes('application/json')) {
-                submissionResult = await response.json();
-            } else {
-                const textResponse = await response.text();
-                try {
-                    submissionResult = JSON.parse(textResponse);
-                } catch (e) {
-                    submissionResult = { message: textResponse };
-                }
-            }
-            
-            console.log('Form submission result:', submissionResult);
-            
-            // Now fetch the search results from the webhook endpoint
-            console.log('Fetching search results from webhook...');
-            
-            // Wait a moment for n8n to process
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            let result = { content: 'No results found' };
             
             try {
-                console.log('Making webhook request with data:', formData);
+                // First try to parse as HTML to find iframe with srcdoc
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(responseText, 'text/html');
+                const iframe = doc.querySelector('iframe');
                 
-                const webhookResponse = await fetch('https://tmm98.app.n8n.cloud/webhook/fe70b591-ea9d-4007-98bb-7c2a5e8c789f', {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify(formData)
-                });
-                
-                console.log('Webhook response status:', webhookResponse.status);
-                console.log('Webhook response ok:', webhookResponse.ok);
-                
-                if (webhookResponse.ok) {
-                    let searchResults;
-                    const contentType = webhookResponse.headers.get('content-type');
-                    
-                    if (contentType && contentType.includes('application/json')) {
-                        searchResults = await webhookResponse.json();
-                    } else {
-                        const textResponse = await webhookResponse.text();
-                        console.log('Webhook text response:', textResponse);
-                        try {
-                            searchResults = JSON.parse(textResponse);
-                        } catch (e) {
-                            searchResults = { message: textResponse, rawResponse: textResponse };
-                        }
-                    }
-                    
-                    console.log('Search results:', searchResults);
-                    
-                    // Check if this is just a workflow start confirmation
-                    if (searchResults.message === "Workflow was started") {
-                        // Show that the workflow is processing
-                        loadingDiv.classList.add('hidden');
-                        displayResults({
-                            ...submissionResult,
-                            workflowStarted: true,
-                            searchStatus: 'processing'
-                        }, formData);
-                    } else {
-                        // Combine submission result with actual search results
-                        const combinedResult = {
-                            ...submissionResult,
-                            searchResults: searchResults,
-                            hasSearchResults: true
-                        };
-                        
-                        // Hide loading and show results
-                        loadingDiv.classList.add('hidden');
-                        displayResults(combinedResult, formData);
-                    }
+                if (iframe && iframe.hasAttribute('srcdoc')) {
+                    // Extract content from srcdoc
+                    const srcdoc = iframe.getAttribute('srcdoc');
+                    // Clean up the content
+                    result.cleanContent = srcdoc
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#39;/g, "'")
+                        .replace(/&amp;/g, '&')
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/\*\*/g, '')
+                        .trim();
                 } else {
-                    console.warn('Webhook request failed with status:', webhookResponse.status);
-                    const errorText = await webhookResponse.text();
-                    console.warn('Webhook error response:', errorText);
-                    
-                    // Show submission result without search results
-                    loadingDiv.classList.add('hidden');
-                    displayResults({
-                        ...submissionResult, 
-                        searchError: `Search service returned error ${webhookResponse.status}: ${errorText || 'Unknown error'}`
-                    }, formData);
+                    // If no iframe with srcdoc, try to parse as JSON
+                    try {
+                        const jsonData = JSON.parse(responseText);
+                        if (jsonData && typeof jsonData === 'object') {
+                            result = { ...result, ...jsonData };
+                        }
+                    } catch (jsonError) {
+                        console.log('Response is not JSON, using raw text');
+                        result.cleanContent = responseText.trim();
+                    }
                 }
-            } catch (webhookError) {
-                console.error('Error fetching search results:', webhookError);
-                console.error('Webhook error details:', {
-                    message: webhookError.message,
-                    stack: webhookError.stack,
-                    name: webhookError.name
-                });
-                
-                // Show submission result without search results
-                loadingDiv.classList.add('hidden');
-                displayResults({
-                    ...submissionResult, 
-                    searchError: `Search service connection failed: ${webhookError.message}`
-                }, formData);
+            } catch (parseError) {
+                console.error('Error parsing response:', parseError);
+                result.cleanContent = responseText.trim();
             }
+            
+            // Ensure we have content to display
+            if (result.cleanContent) {
+                result.content = result.cleanContent;
+            }
+            
+            console.log('Processed result:', result);
+            
+            // Hide loading and show results
+            loadingDiv.classList.add('hidden');
+            displayResults(result, formData);
             
         } catch (error) {
-            console.error('Error submitting form:', error);
-            
-            // Hide loading
+            console.error('Error:', error);
             loadingDiv.classList.add('hidden');
             
-            let errorMessage = 'There was an error processing your request.';
-            let technicalDetails = error.message;
-            
-            if (error.message === 'Failed to fetch') {
-                errorMessage = 'Unable to connect to the processing server. This might be due to network restrictions or CORS policy.';
-                technicalDetails = 'The browser blocked the request due to CORS policy or network connectivity issues.';
-            }
-            
             // Show error message
+            const resultsDiv = document.getElementById('results');
+            const resultsContent = document.getElementById('resultsContent');
             resultsContent.innerHTML = `
-                <div class="results-card" style="border-color: #e74c3c; background-color: #fff5f5;">
-                    <h4 style="color: #e74c3c;">Submission Error</h4>
-                    <p>${errorMessage}</p>
-                    <p><small>Technical details: ${technicalDetails}</small></p>
-                    <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 12px;">
-                        <strong>Troubleshooting:</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            <li>Check your internet connection</li>
-                            <li>Try refreshing the page and submitting again</li>
-                            <li>The n8n webhook server might be temporarily unavailable</li>
-                        </ul>
-                    </div>
-                    <button onclick="resetForm()" class="submit-btn" style="margin-top: 15px; width: auto; padding: 10px 20px;">
-                        Try Again
-                    </button>
+                <div class="error-message">
+                    <h3>Error</h3>
+                    <p>An error occurred while processing your request. Please try again later.</p>
+                    <p>${error.message}</p>
+                    <button onclick="resetForm()" class="btn btn-new-search">Try Again</button>
                 </div>
             `;
             resultsDiv.classList.remove('hidden');
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
         }
     });
 
-    function displayResults(data, originalFormData) {
-        let resultsHtml = '';
+    function displayResults(data, formData) {
+        const resultsDiv = document.getElementById('results');
+        const resultsContent = document.getElementById('resultsContent');
         
-        // Display submitted information
-        resultsHtml += `
-            <div class="results-card">
-                <h4>Submitted Information</h4>
-                <p><strong>Name:</strong> ${originalFormData.Name}</p>
-                <p><strong>Location:</strong> ${originalFormData.Location}</p>
-                <p><strong>Address:</strong> ${originalFormData.Address}</p>
-                <p><strong>Nationality:</strong> ${originalFormData.Nationality}</p>
-                <p><strong>Gender:</strong> ${originalFormData.Gender}</p>
-                <p><strong>Age:</strong> ${originalFormData.Age}</p>
-                <p><strong>ID/Passport:</strong> ${originalFormData["ID/Passport number"]}</p>
-                <p><strong>Submitted:</strong> ${new Date(originalFormData.submittedAt).toLocaleString()}</p>
+        // Clear previous results
+        resultsContent.innerHTML = '';
+        
+        // Create result container
+        const resultContainer = document.createElement('div');
+        resultContainer.className = 'result-container';
+        
+        // Add search query info
+        const searchInfo = document.createElement('div');
+        searchInfo.className = 'search-info';
+        searchInfo.innerHTML = `
+            <h3>Search Results for: ${formData.Name}</h3>
+            <div class="search-meta">
+                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                <p><strong>Reference ID:</strong> REF-${Date.now().toString().slice(-6)}</p>
             </div>
+            <hr class="divider">
         `;
-
-        // Display search results if available
-        if (data && typeof data === 'object') {
-            if (data.hasSearchResults && data.searchResults) {
-                const searchData = data.searchResults;
-                
-                if (searchData.results && Array.isArray(searchData.results) && searchData.results.length > 0) {
-                    resultsHtml += `
-                        <div class="results-card" style="border-color: #e74c3c; background-color: #fff5f5;">
-                            <h4 style="color: #e74c3c;">⚠️ Adverse Media Found</h4>
-                    `;
-                    
-                    searchData.results.forEach((result, index) => {
-                        resultsHtml += `
-                            <div style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #e74c3c; background-color: white; border-radius: 5px;">
-                                <p><strong>Finding ${index + 1}:</strong></p>
-                                <p>${typeof result === 'object' ? JSON.stringify(result, null, 2) : result}</p>
-                            </div>
-                        `;
-                    });
-                    
-                    resultsHtml += `</div>`;
-                } else {
-                    resultsHtml += `
-                        <div class="results-card" style="border-color: #27ae60; background-color: #f8fff9;">
-                            <h4 style="color: #27ae60;">✅ Clean Search Result</h4>
-                            <div class="no-results">
-                                <p>No adverse media findings for the submitted information.</p>
-                                <p>This individual has a clean media profile.</p>
-                            </div>
-                        </div>
-                    `;
+        
+        // Add the search info to container
+        resultContainer.appendChild(searchInfo);
+        
+        // Create result content
+        const resultContent = document.createElement('div');
+        resultContent.className = 'result-content';
+        
+        // Get the content to display
+        const displayText = data.cleanContent || data.content || 'No results found';
+        
+        // Split into sections (split by double newlines)
+        const sections = displayText.split('\n\n').filter(section => section.trim() !== '');
+        
+        if (sections.length > 0) {
+            sections.forEach((section, index) => {
+                const trimmedSection = section.trim();
+                if (trimmedSection) {
+                    // Check if this is a heading (starts with ** and ends with **)
+                    if (trimmedSection.startsWith('**') && trimmedSection.endsWith('**')) {
+                        const heading = document.createElement('h4');
+                        heading.textContent = trimmedSection.replace(/\*\*/g, '');
+                        heading.style.margin = index > 0 ? '1.5em 0 0.5em' : '0 0 0.5em';
+                        heading.style.color = '#2c5f2d';
+                        resultContent.appendChild(heading);
+                    } else {
+                        // Regular paragraph
+                        const p = document.createElement('p');
+                        p.textContent = trimmedSection;
+                        p.style.marginBottom = '1em';
+                        p.style.lineHeight = '1.6';
+                        resultContent.appendChild(p);
+                    }
                 }
-                
-                // Display search metadata
-                if (searchData.searchDate || searchData.sources || searchData.totalChecked) {
-                    resultsHtml += `
-                        <div class="results-card">
-                            <h4>Search Details</h4>
-                            ${searchData.searchDate ? `<p><strong>Search Date:</strong> ${searchData.searchDate}</p>` : ''}
-                            ${searchData.sources ? `<p><strong>Sources Checked:</strong> ${Array.isArray(searchData.sources) ? searchData.sources.join(', ') : searchData.sources}</p>` : ''}
-                            ${searchData.totalChecked ? `<p><strong>Records Checked:</strong> ${searchData.totalChecked}</p>` : ''}
-                        </div>
-                    `;
-                }
-            } else if (data.workflowStarted && data.searchStatus === 'processing') {
-                resultsHtml += `
-                    <div class="results-card" style="border-color: #17a2b8; background-color: #f0f9ff;">
-                        <h4 style="color: #0c5460;">🔄 Search In Progress</h4>
-                        <p>Your adverse media search workflow has been successfully initiated.</p>
-                        <p>The n8n workflow is now processing your request and searching through various data sources.</p>
-                        <div style="margin: 15px 0; padding: 10px; background-color: #e7f3ff; border-radius: 5px;">
-                            <p><strong>Next Steps:</strong></p>
-                            <ul style="margin: 5px 0; padding-left: 20px;">
-                                <li>The workflow will search multiple adverse media databases</li>
-                                <li>Results will be compiled and analyzed automatically</li>
-                                <li>You may need to check your n8n workflow output for final results</li>
-                            </ul>
-                        </div>
-                        <p><em>Note: The n8n workflow is running in the background. Check your n8n dashboard for completion status and detailed results.</em></p>
-                    </div>
-                `;
-            } else if (data.searchError) {
-                resultsHtml += `
-                    <div class="results-card" style="border-color: #ffc107; background-color: #fffbf0;">
-                        <h4 style="color: #856404;">⚠️ Search Status</h4>
-                        <p>Form submitted successfully, but search results are temporarily unavailable.</p>
-                        <p><small>${data.searchError}</small></p>
-                        <p><em>Please contact support if this issue persists.</em></p>
-                    </div>
-                `;
-            } else {
-                resultsHtml += `
-                    <div class="results-card">
-                        <h4>Search Results</h4>
-                        <div class="no-results">
-                            <p>Search completed. Processing results...</p>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Display any additional data from n8n response
-            if (data.message || data.status || data.reference) {
-                resultsHtml += `
-                    <div class="results-card">
-                        <h4>Processing Information</h4>
-                        ${data.message ? `<p><strong>Message:</strong> ${data.message}</p>` : ''}
-                        ${data.status ? `<p><strong>Status:</strong> ${data.status}</p>` : ''}
-                        ${data.reference ? `<p><strong>Reference ID:</strong> ${data.reference}</p>` : ''}
-                    </div>
-                `;
-            }
+            });
         } else {
-            resultsHtml += `
-                <div class="results-card">
-                    <h4>Processing Complete</h4>
-                    <p>Your adverse media search request has been submitted successfully.</p>
-                    <p>The search results will be processed and reviewed by our compliance team.</p>
-                </div>
-            `;
+            const p = document.createElement('p');
+            p.textContent = 'No results found for this search.';
+            p.style.marginBottom = '1em';
+            p.style.lineHeight = '1.6';
+            resultContent.appendChild(p);
         }
-
+        
+        // Add the content to container
+        resultContainer.appendChild(resultContent);
+        
         // Add action buttons
-        resultsHtml += `
-            <div style="text-align: center; margin-top: 20px;">
-                <button onclick="resetForm()" class="submit-btn" style="width: auto; padding: 10px 20px; margin-right: 10px;">
-                    New Search
-                </button>
-                <button onclick="window.print()" class="submit-btn" style="width: auto; padding: 10px 20px; background: #6c757d;">
-                    Print Results
-                </button>
-            </div>
+        const actionButtons = document.createElement('div');
+        actionButtons.className = 'action-buttons';
+        actionButtons.style.marginTop = '2em';
+        actionButtons.style.paddingTop = '1em';
+        actionButtons.style.borderTop = '1px solid #eee';
+        actionButtons.innerHTML = `
+            <button onclick="window.print()" class="btn btn-print">Print Report</button>
+            <button onclick="resetForm()" class="btn btn-new-search">New Search</button>
         `;
-
-        resultsContent.innerHTML = resultsHtml;
+        
+        resultContainer.appendChild(actionButtons);
+        resultsContent.appendChild(resultContainer);
+        
+        // Show results section
         resultsDiv.classList.remove('hidden');
+        resultsDiv.scrollIntoView({ behavior: 'smooth' });
     }
 
     // Global function to reset form
