@@ -179,10 +179,12 @@ select {
 
 /* Results Section */
 #results {
-    display: none;
-    padding: 40px;
-    background-color: #f8f9fa;
-    border-top: 1px solid #e9ecef;
+    margin-top: 2rem;
+    padding: 2rem;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: block; /* Ensure it's a block element */
 }
 
 #results.hidden {
@@ -190,6 +192,8 @@ select {
 }
 
 .result-container {
+    max-width: 800px;
+    margin: 0 auto;
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
@@ -205,21 +209,24 @@ select {
 }
 
 .search-info h3 {
-    margin: 0 0 10px 0;
+    color: #2c5f2d;
+    margin-bottom: 1rem;
     font-size: 1.5rem;
-    font-weight: 600;
 }
 
 .search-meta {
     display: flex;
-    gap: 20px;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    color: #666;
     font-size: 0.9rem;
-    opacity: 0.9;
-    margin-top: 10px;
 }
 
-.search-meta p {
-    margin: 5px 0;
+.divider {
+    border: 0;
+    height: 1px;
+    background: #e0e0e0;
+    margin: 1.5rem 0;
 }
 
 .result-content {
@@ -228,33 +235,32 @@ select {
     color: #333;
 }
 
-.result-content p {
-    margin-bottom: 15px;
-    font-size: 1rem;
-    line-height: 1.6;
+.result-content h4 {
+    color: #2c5f2d;
+    margin: 1.5em 0 0.5em;
+    font-size: 1.2rem;
 }
 
-.result-content p:last-child {
-    margin-bottom: 0;
+.result-content p {
+    margin-bottom: 1em;
 }
 
 .action-buttons {
+    margin-top: 2em;
+    padding-top: 1em;
+    border-top: 1px solid #eee;
     display: flex;
+    gap: 1rem;
     justify-content: flex-end;
-    gap: 15px;
-    padding: 20px 25px;
-    background-color: #f8f9fa;
-    border-top: 1px solid #e9ecef;
 }
 
 .btn {
-    padding: 10px 20px;
+    padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 4px;
-    font-weight: 500;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 0.95rem;
 }
 
 .btn-print {
@@ -263,16 +269,17 @@ select {
 }
 
 .btn-print:hover {
-    background-color: #234f24;
+    background-color: #245225;
 }
 
 .btn-new-search {
-    background-color: #6c757d;
-    color: white;
+    background-color: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
 }
 
 .btn-new-search:hover {
-    background-color: #5a6268;
+    background-color: #e0e0e0;
 }
 
 /* Responsive design */

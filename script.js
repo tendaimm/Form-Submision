@@ -136,8 +136,8 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        // Validate form
         if (!validateForm()) {
-            // Scroll to first error
             const firstError = document.querySelector('.form-group.error');
             if (firstError) {
                 firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -145,6 +145,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Show loading indicator
+        const loadingDiv = document.getElementById('loading');
+        const resultsDiv = document.getElementById('results');
+        loadingDiv.classList.remove('hidden');
+        resultsDiv.classList.add('hidden');
+        
         // Prepare form data
         const formData = {
             "Name": document.getElementById('name').value.trim(),
@@ -156,13 +162,6 @@ document.addEventListener('DOMContentLoaded', function() {
             "ID/Passport number": document.getElementById('idPassport').value.trim() || 'unknown',
             "submittedAt": new Date().toISOString()
         };
-
-        // Show loading indicator
-        const loadingDiv = document.getElementById('loading');
-        loadingDiv.classList.remove('hidden');
-        
-        // Hide any previous results
-        document.getElementById('results').classList.add('hidden');
 
         try {
             console.log('Preparing search with data:', formData);
@@ -251,7 +250,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loadingDiv.classList.add('hidden');
             
             // Show error message
-            const resultsDiv = document.getElementById('results');
             const resultsContent = document.getElementById('resultsContent');
             resultsContent.innerHTML = `
                 <div class="error-message">
@@ -267,11 +265,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function displayResults(data, formData) {
+        console.log('Displaying results with data:', data);
+        
         const resultsDiv = document.getElementById('results');
         const resultsContent = document.getElementById('resultsContent');
         
+        if (!resultsDiv || !resultsContent) {
+            console.error('Required elements not found in the DOM');
+            return;
+        }
+        
         // Clear previous results
         resultsContent.innerHTML = '';
+        console.log('Cleared previous results');
         
         // Create result container
         const resultContainer = document.createElement('div');
@@ -291,6 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add the search info to container
         resultContainer.appendChild(searchInfo);
+        console.log('Added search info');
         
         // Create result content
         const resultContent = document.createElement('div');
@@ -298,9 +305,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Get the content to display
         const displayText = data.cleanContent || data.content || 'No results found';
+        console.log('Content to display:', displayText.substring(0, 100) + '...');
         
         // Split into sections (split by double newlines)
         const sections = displayText.split('\n\n').filter(section => section.trim() !== '');
+        console.log('Found', sections.length, 'sections to display');
         
         if (sections.length > 0) {
             sections.forEach((section, index) => {
@@ -313,6 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         heading.style.margin = index > 0 ? '1.5em 0 0.5em' : '0 0 0.5em';
                         heading.style.color = '#2c5f2d';
                         resultContent.appendChild(heading);
+                        console.log('Added heading:', heading.textContent);
                     } else {
                         // Regular paragraph
                         const p = document.createElement('p');
@@ -320,6 +330,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         p.style.marginBottom = '1em';
                         p.style.lineHeight = '1.6';
                         resultContent.appendChild(p);
+                        console.log('Added paragraph:', p.textContent.substring(0, 50) + '...');
                     }
                 }
             });
@@ -329,10 +340,12 @@ document.addEventListener('DOMContentLoaded', function() {
             p.style.marginBottom = '1em';
             p.style.lineHeight = '1.6';
             resultContent.appendChild(p);
+            console.log('Added no results message');
         }
         
         // Add the content to container
         resultContainer.appendChild(resultContent);
+        console.log('Added content to container');
         
         // Add action buttons
         const actionButtons = document.createElement('div');
@@ -350,7 +363,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Show results section
         resultsDiv.classList.remove('hidden');
+        console.log('Removed hidden class from results div');
+        
+        // Force reflow
+        void resultsDiv.offsetHeight;
+        
+        // Scroll to results
         resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        console.log('Scrolled to results');
     }
 
     // Global function to reset form
